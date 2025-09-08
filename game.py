@@ -20,6 +20,10 @@ class Character:
 
 
 class Hero(Character):
+    def __init__(self, name: str, hp: int, attack: int, defense: int, gold: int):
+        super().__init__(name, hp, attack, defense)
+        self.gold = gold
+
     def normal_attack(self, target: "Character", log: list[str]) -> None:
         damage = max(1, self.attack - target.defense)
         target.take_damage(damage)
@@ -48,7 +52,83 @@ class Enemy(Character):
         log.append(f"{self.name} наносит {damage} урона {target.name}!")
 
 
-def run_battle(hero: Hero, enemies: list[Enemy]) -> bool:
+def random_event(hero: Hero) -> None:
+    event = random.choice(["wanderer", "chest", "dawn"])
+    if event == "wanderer":
+        print("Вы встретили таинственного путника…")
+        choice = input("1) Обменять 5 HP на 10 золота 2) Отказаться\n")
+        if choice == "1" and hero.hp > 5:
+            hero.take_damage(5)
+            hero.gold += 10
+            print("Герой теряет 5 HP и получает 10 золота.")
+        else:
+            print("Вы проходите мимо путника.")
+    elif event == "chest":
+        print("Вы находите сундук…")
+        if random.random() < 0.5:
+            bonus = random.choice(["attack", "defense"])
+            if bonus == "attack":
+                hero.attack += 2
+                print("Вы нашли редкий предмет: +2 к атаке.")
+            else:
+                hero.defense += 2
+                print("Вы нашли редкий предмет: +2 к защите.")
+        else:
+            hero.take_damage(3)
+            print("Сундук оказался пустым! Герой теряет 3 HP.")
+    else:
+        print("Наступает рассвет.")
+        choice = input("1) +1 к атаке 2) +5 HP\n")
+        if choice == "1":
+            hero.attack += 1
+            print("Атака увеличена на 1.")
+        else:
+            hero.heal(5)
+            print("Герой восстанавливает 5 HP.")
+
+
+def open_shop(hero: Hero) -> None:
+    items = [
+        {"name": "Стальной меч", "attack": 2, "cost": 10},
+        {"name": "Щит стража", "defense": 2, "cost": 12},
+        {"name": "Амулет жизни", "hp": 10, "cost": 15},
+    ]
+    offer = random.sample(items, 2)
+    print("\nМагазин. Ваше золото:", hero.gold)
+    for idx, item in enumerate(offer, 1):
+        if "attack" in item:
+            desc = f"+{item['attack']} к атаке"
+        elif "defense" in item:
+            desc = f"+{item['defense']} к защите"
+        else:
+            desc = f"+{item['hp']} HP"
+        print(f"{idx}) {item['name']} ({desc}) - {item['cost']} золота")
+    choice = input("Выберите предмет для покупки или 0 для выхода\n")
+    if choice in {"1", "2"}:
+        item = offer[int(choice) - 1]
+        if hero.gold >= item["cost"]:
+            hero.gold -= item["cost"]
+            if "attack" in item:
+                hero.attack += item["attack"]
+                print(
+                    f"Герой покупает предмет за {item['cost']} золота: +{item['attack']} к атаке."
+                )
+            elif "defense" in item:
+                hero.defense += item["defense"]
+                print(
+                    f"Герой покупает предмет за {item['cost']} золота: +{item['defense']} к защите."
+                )
+            else:
+                hero.max_hp += item["hp"]
+                hero.hp += item["hp"]
+                print(
+                    f"Герой покупает предмет за {item['cost']} золота: +{item['hp']} HP."
+                )
+        else:
+            print("Недостаточно золота.")
+
+
+def run_battle(hero: Hero, enemies: list[Enemy], reward_gold: int = 0) -> bool:
     log: list[str] = []
 
     while hero.is_alive() and any(e.is_alive() for e in enemies):
@@ -82,6 +162,9 @@ def run_battle(hero: Hero, enemies: list[Enemy]) -> bool:
 
     if hero.is_alive():
         log.append("Победа! Все враги повержены.")
+        if reward_gold:
+            hero.gold += reward_gold
+            log.append(f"{hero.name} получает {reward_gold} золота.")
     else:
         log.append("Поражение… Герой пал в бою.")
 
@@ -93,14 +176,14 @@ def run_battle(hero: Hero, enemies: list[Enemy]) -> bool:
 
 
 def main() -> None:
-    hero = Hero("Герой", hp=100, attack=20, defense=5)
+    hero = Hero("Герой", hp=100, attack=20, defense=5, gold=20)
 
     enemies_first = [
         Enemy("Слабый гоблин", hp=30, attack=10, defense=2),
         Enemy("Сильный орк", hp=50, attack=15, defense=3),
     ]
 
-    if not run_battle(hero, enemies_first):
+    if not run_battle(hero, enemies_first, reward_gold=15):
         return
 
     # Лут после первого боя
@@ -111,6 +194,8 @@ def main() -> None:
         hero.defense += 2
         print("Вы получили предмет: +2 к защите.")
 
+    random_event(hero)
+
     print("\nЛагерь. Ваши действия?")
     camp_choice = input("1) Отдохнуть (+30 HP) 2) Получить бафф (+3 к защите)\n")
     if camp_choice == "1":
@@ -119,6 +204,8 @@ def main() -> None:
     else:
         hero.defense += 3
         print(f"{hero.name} получает бафф: +3 к защите.")
+
+    open_shop(hero)
 
     upgrade_choice = input("Выберите повышение: 1) +5 HP 2) +2 к атаке\n")
     if upgrade_choice == "1":
@@ -129,8 +216,8 @@ def main() -> None:
         hero.attack += 2
         print("Атака увеличена на 2.")
 
-    boss = [Enemy("Дракон", hp=120, attack=25, defense=8)]
-    run_battle(hero, boss)
+    boss = [Enemy("Дракон", hp=150, attack=28, defense=10)]
+    run_battle(hero, boss, reward_gold=50)
 
 
 if __name__ == "__main__":
